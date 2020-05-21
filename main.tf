@@ -62,6 +62,7 @@ module "aws_eu_vpc" {
   providers = {
     aws = aws.aws-eu
   }
+    
 }
 
 resource "aws_vpc_peering_connection" "peer" {
