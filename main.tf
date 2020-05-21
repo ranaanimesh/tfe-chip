@@ -1,8 +1,8 @@
 locals{
-  azslist = data.aws_availability_zones.eu-azs.names   
-  azslistnum = [1,2,3]
-  azslistwest = data.aws_availability_zones.west-azs.names
-  azslistnumwest = [1,2]
+  azseulist = data.aws_availability_zones.eu-azs.names   
+  azseulistnum = [1,2,3]
+  azswestlist = data.aws_availability_zones.west-azs.names
+  azswestlistnum = [1,2]
 }
 provider "aws" {
   alias  = "eu-central-1"
@@ -28,14 +28,14 @@ module "eu-vpc" {
 
 # Grab entire set of names if needed from data source
   #azs             = [data.aws_availability_zones.eu-azs.names[0], data.aws_availability_zones.eu-azs.names[1], data.aws_availability_zones.eu-azs.names[2]]
-  azs             = local.azslist
+  azs             = local.azseulist
 
 # Use cidrsubnet function with for_each to create the right number of subnets
   #public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
   #public_subnets  = cidrsubnets("10.0.0.0/16", 2, 2, 2, 2)  
   
   public_subnets  =  [
-      for num in local.azslistnum:
+      for num in local.azseulistnum:
       cidrsubnet("10.0.0.0/16", 2, num)
     ] 
 
@@ -61,12 +61,12 @@ module "west-vpc" {
   cidr = "10.1.0.0/16"
 
 # Grab entire set of names if needed from data source
-  azs             = local.azslistwest
+  azs             = local.azswestlist
 
 # Use cidrsubnet function with for_each to create the right number of subnets
   #public_subnets  = ["10.1.101.0/24", "10.1.102.0/24", "10.1.103.0/24"]
   public_subnets  =  [
-      for num in local.azslistnumwest:
+      for num in local.azswestlistnum:
       cidrsubnet("10.1.0.0/16", 2, num)
     ] 
 
