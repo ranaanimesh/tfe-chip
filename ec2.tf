@@ -21,7 +21,7 @@ resource "aws_instance" "drupal" {
     }
   }
   provisioner "file" {
-    source      = "configs/apache.conf"
+    source      = "./apache.conf"
     destination = "/tmp/apache.conf"
     connection {
         user = "admin"
