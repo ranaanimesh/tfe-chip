@@ -1,104 +1,90 @@
-locals{
-  azseulist = data.aws_availability_zones.eu-azs.names   
-  azseulistnum = [1,2,3]
-  azswestlist = data.aws_availability_zones.west-azs.names
-  azswestlistnum = [1,2]
-}
-provider "aws" {
-  alias  = "eu-central-1"
-  region = "eu-central-1"
+data "aws_availability_zones" "available_us" {
+  provider = aws.aws-west
+  state    = "available"
 }
 
-provider "aws" {
-  alias  = "us-west-1"
-  region = "us-west-1"
-}
+module "aws_us_vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
 
+  name = var.aws_vpc_us_name
+  cidr = var.aws_vpc_us_cidr_block
 
-data "aws_availability_zones" "eu-azs" {
-  provider = aws.eu-central-1
-  state = "available"
-}
+  # azs  = [data.aws_availability_zones.available.names[0], data.aws_availability_zones.available.names[1]]
+  azs  = [for zone in data.aws_availability_zones.available_us.names : zone]
 
-module "eu-vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+  public_subnets = [for num in range(length(data.aws_availability_zones.available_us.names)) : cidrsubnet(var.aws_vpc_us_cidr_block, 5, (num + 1) * 8)]
 
-  name = "eu-vpc"
-  cidr = "10.0.0.0/16"
+  private_subnets = [for num in range(length(data.aws_availability_zones.available_us.names)) : cidrsubnet(var.aws_vpc_us_cidr_block, 5, ((num + 1) * 8) + 1)]
 
-# Grab entire set of names if needed from data source
-  #azs             = [data.aws_availability_zones.eu-azs.names[0], data.aws_availability_zones.eu-azs.names[1], data.aws_availability_zones.eu-azs.names[2]]
-  azs             = local.azseulist
+  enable_nat_gateway = true
+  enable_vpn_gateway = false
 
-# Use cidrsubnet function with for_each to create the right number of subnets
-  #public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
-  #public_subnets  = cidrsubnets("10.0.0.0/16", 2, 2, 2, 2)  
-  
-  public_subnets  =  [
-      for num in local.azseulistnum:
-      cidrsubnet("10.0.0.0/16", 2, num)
-    ] 
+  enable_dns_hostnames = true
+  enable_dns_support   = true
 
-    #public_subnets  = cidrsubnet("10.0.0.0/16", 2, )  
+  tags = {
+    Name = var.aws_vpc_us_name
+  }
 
   providers = {
-    aws = aws.eu-central-1
+    aws = aws.aws-west
   }
 }
 
-
-##########################################################################
-
-data "aws_availability_zones" "west-azs" {
-  provider = aws.us-west-1
-  state = "available"
+data "aws_availability_zones" "available_eu" {
+  provider =  aws.aws-eu
+  state   = "available"
 }
 
-module "west-vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+module "aws_eu_vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
 
-  name = "west-vpc"
-  cidr = "10.1.0.0/16"
+  name = var.aws_vpc_eu_name
+  cidr = var.aws_vpc_eu_cidr_block
 
-# Grab entire set of names if needed from data source
-  azs             = local.azswestlist
+  # azs  = [data.aws_availability_zones.available.names[0], data.aws_availability_zones.available.names[1]]
+  azs  = [for zone in data.aws_availability_zones.available_eu.names : zone]
 
-# Use cidrsubnet function with for_each to create the right number of subnets
-  #public_subnets  = ["10.1.101.0/24", "10.1.102.0/24", "10.1.103.0/24"]
-  public_subnets  =  [
-      for num in local.azswestlistnum:
-      cidrsubnet("10.1.0.0/16", 2, num)
-    ] 
+  public_subnets = [for num in range(length(data.aws_availability_zones.available_eu.names)) : cidrsubnet(var.aws_vpc_eu_cidr_block, 5, (num + 1) * 8)]
 
+  private_subnets = [for num in range(length(data.aws_availability_zones.available_eu.names)) : cidrsubnet(var.aws_vpc_eu_cidr_block, 5, ((num + 1) * 8) + 1)]
+
+  enable_nat_gateway = true
+  enable_vpn_gateway = false
+
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = var.aws_vpc_eu_name
+  }
 
   providers = {
-    aws = aws.us-west-1
+    aws = aws.aws-eu
   }
 }
-
-##########################################################################
-
 
 resource "aws_vpc_peering_connection" "peer" {
-  provider      = aws.eu-central-1
-  vpc_id        = module.eu-vpc.vpc_id
-  peer_vpc_id   = module.west-vpc.vpc_id
-  peer_region   = "us-west-1"
+  provider      = aws.aws-west
+  vpc_id        = module.aws_us_vpc.vpc_id
+  peer_vpc_id   = module.aws_eu_vpc.vpc_id
+  peer_region   = "eu-central-1"
   auto_accept   = false
+
+  tags = {
+    Name = "vpc-us-west-1 to vpc-eu-central-1 VPC peering"
+  }
 }
 
-# Accepter's side of the connection.
 resource "aws_vpc_peering_connection_accepter" "peer" {
-  provider                  = aws.us-west-1
+  provider                  = aws.aws-eu
   vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
   auto_accept               = true
 }
 
-##########################################################################
-
-resource "aws_default_security_group" "eu-vpc" {
-  provider = aws.eu-central-1
-  vpc_id   = module.eu-vpc.vpc_id
+resource "aws_default_security_group" "us-west-vpc" {
+  provider = aws.aws-west
+  vpc_id   = module.aws_us_vpc.vpc_id
 
   ingress {
     protocol  = -1
@@ -115,11 +101,9 @@ resource "aws_default_security_group" "eu-vpc" {
   }
 }
 
-##########################################################################
-
-resource "aws_default_security_group" "west-vpc" {
-  provider = aws.us-west-1
-  vpc_id   = module.west-vpc.vpc_id
+resource "aws_default_security_group" "eu-central-vpc" {
+  provider = aws.aws-eu
+  vpc_id   = module.aws_eu_vpc.vpc_id
 
   ingress {
     protocol  = -1
@@ -136,52 +120,18 @@ resource "aws_default_security_group" "west-vpc" {
   }
 }
 
-##########################################################################
+resource "aws_route" "us-vpc" {
+  provider                  = aws.aws-west
+  count                     = length(module.aws_eu_vpc.public_subnets_cidr_blocks)
+  route_table_id            = module.aws_us_vpc.public_route_table_ids[0]
+  destination_cidr_block    = module.aws_eu_vpc.public_subnets_cidr_blocks[count.index]
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+}
 
 resource "aws_route" "eu-vpc" {
-  provider                  = aws.eu-central-1
-# Need to create a route for every combination of route_table_id on module.eu-vpc.public_route_table_ids with every cidr_block on module.west-vpc.public_cidr_blocks. Look into setproduct function. Using setproduct, element, and length, this can be done dynamically
-  count                     = 1
-  route_table_id            = module.eu-vpc.public_route_table_ids[0]
-  destination_cidr_block    = module.west-vpc.public_subnets_cidr_blocks[0]
+  provider                  = aws.aws-eu
+  count                     = length(module.aws_us_vpc.public_subnets_cidr_blocks)
+  route_table_id            = module.aws_eu_vpc.public_route_table_ids[0]
+  destination_cidr_block    = module.aws_us_vpc.public_subnets_cidr_blocks[count.index]
   vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
 }
-
-##########################################################################
-
-resource "aws_route" "west-vpc" {
-  provider                  = aws.us-west-1
-# Need to create a route for every combination of route_table_id on module.west-vpc.public_route_table_ids with every cidr_block on module.eu-vpc.public_cidr_blocks. Look into setproduct function. Using setproduct, element, and length, this can be done dynamically
-  count                     = 1
-  route_table_id            = module.west-vpc.public_route_table_ids[0]
-  destination_cidr_block    = module.eu-vpc.public_subnets_cidr_blocks[0]
-  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
-}
-
-
-
-
-
-
-#####################################################################
-
-
-# to be removed
-provider "aws" {
-  alias  = "us-east-1"
-  region = "us-east-1"
-}
-
-resource "aws_s3_bucket" "b" {
-  provider = aws.us-east-1
-  bucket = "my-tf-test-bucket-terraform-chip"
-  acl    = "private"
-
-  tags = {
-    Name        = "My bucket"
-    Environment = "Dev"
-  }
-}
-
-
-#####################################################################
