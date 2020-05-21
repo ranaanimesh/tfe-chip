@@ -1,28 +1,15 @@
-# AWS Region
-variable "region" {
-  default = "us-west-1"
+variable "aws_vpc_eu_cidr_block" {
+  default = "10.1.0.0/16"
 }
 
-# The AMI image to use (Debian 8)
-variable "aws_amis" {
-  default = {
-    "us-west-1"      = "ami-06fcc1f0bc2c8943f"
-  }
+variable "aws_vpc_us_cidr_block" {
+  default = "10.0.0.0/16"
 }
 
-# Size of the instance
-variable "instance_type" {
-  default = "t2.small"
+variable "aws_vpc_eu_name" {
+  default = "pu-app-eu-vpc"
 }
 
-# SSH key to deploy
-variable "key_name" {
-  description = "Key pair to use"
-  default     = "terraform_vm"
-}
-
-# Whitelist your IP for SSH access here
-variable "ip_whitelist" {
-  description = "Whitelisted IP for SSH access"
-  default     = "0.0.0.0/0"
+variable "aws_vpc_us_name" {
+  default = "pu-app-us-vpc"
 }
