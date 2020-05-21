@@ -14,7 +14,7 @@ resource "aws_instance" "drupal" {
     Name = "Drupal"
   }
   provisioner "file" {
-    source      = "scripts/drupal.sh"
+    source      = "./drupal.sh"
     destination = "/tmp/drupal.sh"
     connection {
         user = "admin"
