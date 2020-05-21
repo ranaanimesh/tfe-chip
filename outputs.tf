@@ -1,16 +1,7 @@
-# The EC2 instance
-output "EC2_IP_address" {
-  value = "${aws_instance.drupal.public_ip}"
+output aws-availability-zones-eu {
+  value = data.aws_availability_zones.available_eu
 }
 
-output "EC2_DNS_name" {
-  value = "${aws_instance.drupal.public_dns}"
-}
-
-# The RDS instance
-output "db_instance_id" {
-  value = "${aws_db_instance.drupal.id}"
-}
-output "db_instance_address" {
-  value = "${aws_db_instance.drupal.address}"
+output aws-availability-zones-us {
+  value = data.aws_availability_zones.available_us
 }
